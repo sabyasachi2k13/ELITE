@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 from collections import OrderedDict
 from typing import Dict, Tuple
 
-#from plotly.missing_ipywidgets import 
+# from plotly.missing_ipywidgets import
 import plotly.express as px
 import pytorch_lightning as pl
 import torch
@@ -20,10 +20,11 @@ from test_tube.argparse_hopt import TTNamespace
 from torch import optim
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader, RandomSampler
-from torchmetrics import (AUROC, F1Score, ROC, Accuracy, AveragePrecision,
-                          MatthewsCorrCoef, Precision, PrecisionRecallCurve,
+from torchmetrics import (AUROC, ROC, Accuracy, AveragePrecision,
+                          Precision, PrecisionRecallCurve,
                           Recall, ConfusionMatrix)
 from torchmetrics.collections import MetricCollection
+# from torchnlp.datasets.dataset import Dataset
 from torchnlp.encoders import LabelEncoder
 from torchnlp.utils import collate_tensors
 from transformers import BertModel, BertTokenizer, BertConfig
@@ -34,12 +35,13 @@ import settings
 from data.PPIDataset import PPIDataset, Dataset
 from utils.ProtBertPPIArgParser import ProtBertPPIArgParser
 
+
 class ProtBertPPIModel(pl.LightningModule):
     """
     # https://github.com/minimalist-nlp/lightning-text-classification.git
-    
+
     Sample model to show how to use BERT to classify PPIs.
-    
+
     :param params: ArgumentParser containing the hyperparameters.
     """
 
@@ -65,12 +67,12 @@ class ProtBertPPIModel(pl.LightningModule):
         # Moreover they can also not be logged with mlflow as deepcopy of these variables do not work
         try:
             # delattr(params,'local_logger')
-            delattr(params,'trials')
-            delattr(params,'optimize_parallel')
-            delattr(params,'optimize_parallel_gpu')
-            delattr(params,'optimize_parallel_cpu')
-            delattr(params,'optimize_trials_parallel_gpu')
-            delattr(params,'generate_trials')
+            delattr(params, 'trials')
+            delattr(params, 'optimize_parallel')
+            delattr(params, 'optimize_parallel_gpu')
+            delattr(params, 'optimize_parallel_cpu')
+            delattr(params, 'optimize_trials_parallel_gpu')
+            delattr(params, 'generate_trials')
         except AttributeError:
             pass
 
@@ -87,32 +89,25 @@ class ProtBertPPIModel(pl.LightningModule):
         self.current_test_epoch = 0
 
         self.model_name = "Rostlab/prot_bert_bfd"
-        
+
         self.dataset = PPIDataset()
-        
+
         # self.dataset.calculate_stat(self.hparams.train_csv)
 
         self.train_metrics = MetricCollection([
-            Accuracy(), 
-            Precision(), 
-            Recall(), 
-            F1Score(),
+            Accuracy(),
+            Precision(),
+            Recall(),
             AveragePrecision(pos_label=1),
             AUROC(pos_label=1),
-            MatthewsCorrCoef(num_classes=2),
         ], prefix='train_')
 
         self.valid_metrics = MetricCollection([
-            Accuracy(), 
-            Precision(), 
-            Recall(), 
-            F1Score(),
+            Accuracy(),
+            Precision(),
+            Recall(),
             AveragePrecision(pos_label=1),
-            ConfusionMatrix(num_classes=2,),
-            PrecisionRecallCurve(pos_label=1),
-            AUROC(pos_label=1,average=None),
-            ROC(pos_label=1),
-            MatthewsCorrCoef(num_classes=2),
+            AUROC(pos_label=1, average=None),
         ], prefix='val_')
 
         self.test_metrics = self.valid_metrics.clone(prefix="test_")
@@ -127,11 +122,11 @@ class ProtBertPPIModel(pl.LightningModule):
         if self.hparams.nr_frozen_epochs > 0:
             self.freeze_encoder()
         else:
-            self._frozen = False # don't need to call unfreeze_encoder, as it is always in unfrozen state.
+            self._frozen = False  # don't need to call unfreeze_encoder, as it is always in unfrozen state.
 
     def __build_model(self) -> None:
         """ Init BERT model + tokenizer + classification head."""
-        
+
         config = BertConfig.from_pretrained(self.model_name)
         config.gradient_checkpointing = True
         self.ProtBertBFD = BertModel.from_pretrained(self.model_name, config=config)
@@ -147,14 +142,10 @@ class ProtBertPPIModel(pl.LightningModule):
         self.label_encoder.unknown_index = None
 
         self.classification_head = nn.Sequential(OrderedDict([
-            ("dropout1", nn.Dropout(self.hparams.dropout_prob)),
-            ("dense1", nn.Linear(self.encoder_features*4, int(self.encoder_features * 4 / 16))),
-            ("dropout2", nn.Dropout(0.2)),
-            ("dense2", nn.Linear(int(self.encoder_features*4 / 16), int(self.encoder_features*4 / (16*16)))),
+            ("dense2", nn.Linear(self.encoder_features * 4, self.encoder_features)),
             ("dropout3", nn.Dropout(0.2)),
-            ("dense3", nn.Linear(int(self.encoder_features*4 / (16*16)), 1)),
+            ("dense3", nn.Linear(self.encoder_features, 1)),
         ]))
-
         self.sigmoid = nn.Sigmoid()
 
     def classifier(self, model_out_A, model_out_B):
@@ -205,7 +196,7 @@ class ProtBertPPIModel(pl.LightningModule):
             input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
             sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
 
-            #If tokens are weighted (by WordWeights layer), feature 'token_weights_sum' will be present
+            # If tokens are weighted (by WordWeights layer), feature 'token_weights_sum' will be present
             if 'token_weights_sum' in features:
                 sum_mask = features['token_weights_sum'].unsqueeze(-1).expand(sum_embeddings.size())
             else:
@@ -224,7 +215,7 @@ class ProtBertPPIModel(pl.LightningModule):
     def forward(self, input_ids, token_type_ids, attention_mask):
         """
         Usual pytorch forward function.
-        
+
         TODO: Refactor for retrieving input for both sequences
 
         Args:
@@ -257,8 +248,8 @@ class ProtBertPPIModel(pl.LightningModule):
         return self._loss_bce_with_integrated_sigmoid(predictions["logits"], targets["labels"].float())
 
     def prepare_sample_without_target(self, sample: list):
-        collated_sample = collate_tensors(sample) #type: ignore
-        inputs_A, inputs_B, _ = self.prepare_sample(sample, prepare_target = False)
+        collated_sample = collate_tensors(sample)  # type: ignore
+        inputs_A, inputs_B, _ = self.prepare_sample(sample, prepare_target=False)
 
         return inputs_A, inputs_B, collated_sample
 
@@ -266,26 +257,26 @@ class ProtBertPPIModel(pl.LightningModule):
         """
         Function that prepares a sample to input the model.
         :param sample: list of dictionaries.
-        
+
         Returns:
             - dictionary with the expected model inputs.
             - dictionary with the expected target labels.
         """
-        collated_sample = collate_tensors(sample) #type: ignore
+        collated_sample = collate_tensors(sample)  # type: ignore
 
         inputs_A = self.tokenizer.batch_encode_plus(collated_sample["seqA"],
-                                                  add_special_tokens=True,
-                                                  padding=True,
-                                                  truncation=True,
-                                                  return_tensors=TensorType.PYTORCH,
-                                                  max_length=self.hparams.max_length)
+                                                    add_special_tokens=True,
+                                                    padding=True,
+                                                    truncation=True,
+                                                    return_tensors=TensorType.PYTORCH,
+                                                    max_length=self.hparams.max_length)
 
         inputs_B = self.tokenizer.batch_encode_plus(collated_sample["seqB"],
-                                                  add_special_tokens=True,
-                                                  padding=True,
-                                                  truncation=True,
-                                                  return_tensors=TensorType.PYTORCH,
-                                                  max_length=self.hparams.max_length)
+                                                    add_special_tokens=True,
+                                                    padding=True,
+                                                    truncation=True,
+                                                    return_tensors=TensorType.PYTORCH,
+                                                    max_length=self.hparams.max_length)
 
         if not prepare_target:
             return inputs_A, inputs_B, {}
@@ -304,12 +295,13 @@ class ProtBertPPIModel(pl.LightningModule):
         super().on_train_start()
 
         if self.global_rank == 0 and isinstance(self.logger.experiment, MlflowClient):
-            self.mlflow : MlflowClient = self.logger.experiment
-        
+            self.mlflow: MlflowClient = self.logger.experiment
+
             # Save model description to mlflow artifacts
             # self.mlflow.log_text(self.logger.run_id, str(ModelSummary(self, mode=ModelSummaryMode.FULL)), "./model/model_summary.txt")
             self.mlflow.log_text(self.logger.run_id, str(self), "./model/model_summary_with_params.txt")
-            self.local_logger.info("Training started, check out run: %s", settings.MLFLOW_TRACKING_URI + "/#/experiments/" + self.logger.experiment_id + "/runs/" + self.logger.run_id)
+            self.local_logger.info("Training started, check out run: %s",
+                                   settings.MLFLOW_TRACKING_URI + "/#/experiments/" + self.logger.experiment_id + "/runs/" + self.logger.run_id)
 
     def __single_step(self, batch):
         inputs_A, inputs_B, targets = batch
@@ -326,11 +318,11 @@ class ProtBertPPIModel(pl.LightningModule):
         return (loss, trues, preds)
 
     def training_step(self, batch: tuple, batch_nb: int, *args, **kwargs) -> dict:
-        """ 
+        """
         Runs one training step. This usually consists in the forward function followed
             by the loss function.
-        
-        :param batch: The output of your dataloader. 
+
+        :param batch: The output of your dataloader.
         :param batch_nb: Integer displaying which batch this is
         Returns:
             - dictionary containing the loss and the metrics to be added to the lightning logger.
@@ -351,7 +343,7 @@ class ProtBertPPIModel(pl.LightningModule):
         """
         result = self.train_metrics.compute()
         self.train_metrics.reset()
-        
+
         result.pop('train_ROC', None)
         result.pop('train_PrecisionRecallCurve', None)
         self.log_dict(result, on_epoch=True)
@@ -359,7 +351,8 @@ class ProtBertPPIModel(pl.LightningModule):
         if self.global_rank == 0:
             self.local_logger.info("Training epoch %s finished", self.current_epoch)
             if isinstance(self.logger.experiment, MlflowClient):
-                self.local_logger.info("Check out run: %s", settings.MLFLOW_TRACKING_URI + "/#/experiments/" + self.logger.experiment_id + "/runs/" + self.logger.run_id)
+                self.local_logger.info("Check out run: %s",
+                                       settings.MLFLOW_TRACKING_URI + "/#/experiments/" + self.logger.experiment_id + "/runs/" + self.logger.run_id)
 
         # check for unfreezing encoder
         if self.current_epoch + 1 >= self.hparams.nr_frozen_epochs:
@@ -396,9 +389,9 @@ class ProtBertPPIModel(pl.LightningModule):
         # do not log ROC and PRC
         result.pop(self.valid_metrics.prefix + 'ROC', None)
         result.pop(self.valid_metrics.prefix + 'PrecisionRecallCurve', None)
-        result.pop(self.valid_metrics.prefix + 'ConfusionMatrix', torch.Tensor([[-1,-1],[-1,-1]]))
+        result.pop(self.valid_metrics.prefix + 'ConfusionMatrix', torch.Tensor([[-1, -1], [-1, -1]]))
         self.log_dict(result, on_epoch=True)
-        
+
         self.current_val_epoch += 1
 
     def test_step(self, batch: tuple, batch_nb: int, *args, **kwargs) -> dict:
@@ -409,7 +402,7 @@ class ProtBertPPIModel(pl.LightningModule):
         test_loss, trues, preds = self.__single_step(batch)
 
         self.test_metrics.update(preds, trues)
-        
+
         output = OrderedDict({
             'test_loss': test_loss,
         })
@@ -426,14 +419,14 @@ class ProtBertPPIModel(pl.LightningModule):
         self.test_metrics.reset()
 
         self.log('test_loss', test_loss, on_epoch=True, prog_bar=True)
-        
-        #self.log_roc_graph(result, self.test_metrics.prefix)
-        #self.log_prc_graph(result, self.test_metrics.prefix)
+
+        # self.log_roc_graph(result, self.test_metrics.prefix)
+        # self.log_prc_graph(result, self.test_metrics.prefix)
 
         # do not log ROC and PRC
         result.pop(self.test_metrics.prefix + 'ROC', None)
         result.pop(self.test_metrics.prefix + 'PrecisionRecallCurve', None)
-        result.pop(self.test_metrics.prefix + 'ConfusionMatrix', torch.Tensor([[-1,-1],[-1,-1]]))
+        result.pop(self.test_metrics.prefix + 'ConfusionMatrix', torch.Tensor([[-1, -1], [-1, -1]]))
         self.log_dict(result, on_epoch=True)
 
         self.current_test_epoch += 1
@@ -480,7 +473,7 @@ class ProtBertPPIModel(pl.LightningModule):
     def num_training_steps(self) -> int:
         """
         Total training steps inferred from datamodule and devices.
-        
+
         https://github.com/PyTorchLightning/pytorch-lightning/issues/5449#issuecomment-774265729
         """
         if self.trainer.max_steps:
@@ -511,23 +504,26 @@ class ProtBertPPIModel(pl.LightningModule):
         if current_step < num_warmup_steps:
             return float(current_step) / float(max(1, num_warmup_steps))
         return max(
-            0.0, float(self.num_training_steps - current_step) / float(max(1, self.num_training_steps - num_warmup_steps))
+            0.0,
+            float(self.num_training_steps - current_step) / float(max(1, self.num_training_steps - num_warmup_steps))
         )
 
     def configure_optimizers(self):
         """
         Confiugre the optimizers and schedulears.
 
-        It also sets different learning rates for different parameter groups. 
+        It also sets different learning rates for different parameter groups.
         """
         no_decay_params = ["bias", "LayerNorm.weight"]
         optimizer_grouped_parameters = [
             {
-                "params": [param for name, param in self.ProtBertBFD.named_parameters() if not any(ndp in name for ndp in no_decay_params)], 
+                "params": [param for name, param in self.ProtBertBFD.named_parameters() if
+                           not any(ndp in name for ndp in no_decay_params)],
                 "lr": self.hparams.encoder_learning_rate,
             },
             {
-                "params": [param for name, param in self.ProtBertBFD.named_parameters() if any(ndp in name for ndp in no_decay_params)],
+                "params": [param for name, param in self.ProtBertBFD.named_parameters() if
+                           any(ndp in name for ndp in no_decay_params)],
                 "weight_decay": 0.0,
                 "lr": self.hparams.encoder_learning_rate,
             },
@@ -542,7 +538,7 @@ class ProtBertPPIModel(pl.LightningModule):
             lr=self.hparams.learning_rate,
             weight_decay=self.hparams.weight_decay,
             eps=self.hparams.adam_epsilon,
-            #betas = self.hparams.betas
+            # betas = self.hparams.betas
         )
 
         scheduler = LambdaLR(optimizer, self.lr_lambda)
@@ -569,7 +565,7 @@ class ProtBertPPIModel(pl.LightningModule):
             return self.dataset.load_predict_dataset(self.hparams.predict_csv)
         else:
             raise Exception('Incorrect dataset split')
-    
+
     def train_dataloader(self) -> DataLoader:
         """ Function that loads the train set. """
         self._train_dataset = self.__retrieve_dataset(train=True)
@@ -613,7 +609,7 @@ class ProtBertPPIModel(pl.LightningModule):
 
     @staticmethod
     def add_model_specific_args(parent_parser: ArgumentParser) -> ProtBertPPIArgParser:
-        """ Parser for Estimator specific arguments/hyperparameters. 
+        """ Parser for Estimator specific arguments/hyperparameters.
         :param parser: HyperOptArgumentParser obj
         Returns:
             - updated parser
@@ -702,7 +698,7 @@ class ProtBertPPIModel(pl.LightningModule):
             "--dropout_prob",
             default=0.5,
             tunable=True,
-            options=[0.2,0.3, 0.4, 0.5],
+            options=[0.2, 0.3, 0.4, 0.5],
             type=float,
             help="Classification head dropout probability.",
         )
