@@ -1,7 +1,7 @@
 # ELITE
 Data and code for ELITE E3 Ligase substrate Interaction Prediction using BERT.
 ELITE: E3 Ligase Inference for Tissue specific Elimination: A LLM Based E3 Ligase Prediction System for Precise Targeted Protein Degradation
-https://www.biorxiv.org/content/10.1101/2025.11.05.686884v1
+https://www.biorxiv.org/content/10.1101/2025.11.05.686884v2
 ## Relevant files
 1. ''ppi_finetuning.py'' tackles the finetuning and prediction for use case 1 ( tissue-specific ppi prediction)
 
